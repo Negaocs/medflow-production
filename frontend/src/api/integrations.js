@@ -1,22 +1,37 @@
-import { base44 } from './base44Client';
+// Simulação de integrações do Base44 para o frontend
+// Este arquivo simula as integrações do Base44 para permitir o funcionamento do frontend
 
+export const api = {
+  get: async (url) => {
+    console.log(`Simulando GET para ${url}`);
+    return { success: true, data: [] };
+  },
+  
+  post: async (url, data) => {
+    console.log(`Simulando POST para ${url}`, data);
+    return { success: true, data: { id: 'new-id', ...data } };
+  },
+  
+  put: async (url, data) => {
+    console.log(`Simulando PUT para ${url}`, data);
+    return { success: true, data };
+  },
+  
+  delete: async (url) => {
+    console.log(`Simulando DELETE para ${url}`);
+    return { success: true };
+  }
+};
 
-
-
-export const Core = base44.integrations.Core;
-
-export const InvokeLLM = base44.integrations.Core.InvokeLLM;
-
-export const SendEmail = base44.integrations.Core.SendEmail;
-
-export const UploadFile = base44.integrations.Core.UploadFile;
-
-export const GenerateImage = base44.integrations.Core.GenerateImage;
-
-export const ExtractDataFromUploadedFile = base44.integrations.Core.ExtractDataFromUploadedFile;
-
-
-
-
-
+export const file = {
+  upload: async (file) => {
+    console.log(`Simulando upload de arquivo ${file.name}`);
+    return { success: true, url: `https://example.com/files/${file.name}` };
+  },
+  
+  download: async (url) => {
+    console.log(`Simulando download de arquivo ${url}`);
+    return { success: true, data: new Blob(['conteúdo simulado']) };
+  }
+};
 
