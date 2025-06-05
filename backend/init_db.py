@@ -1,35 +1,92 @@
 import os
 import sys
-from app import app, db, User
+import logging
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
+from models import Base, User, get_password_hash
+from dotenv import load_dotenv
+
+# Configurar logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("medflow-init-db")
+
+# Carregar variáveis de ambiente
+load_dotenv()
 
 def init_database():
-    """Inicializar banco de dados e criar usuário admin"""
-    with app.app_context():
+    """Inicializa o banco de dados e cria usuário admin se não existir."""
+    try:
+        # Obter URL do banco de dados
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            logger.error("Variável de ambiente DATABASE_URL não encontrada")
+            sys.exit(1)
+        
+        logger.info(f"Conectando ao banco de dados: {database_url.split('@')[1] if '@' in database_url else 'URL oculta'}")
+        
+        # Criar engine
+        engine = create_engine(database_url)
+        
+        # Testar conexão
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT 1"))
+            logger.info(f"Conexão com banco de dados estabelecida: {result.fetchone()}")
+        
         # Criar tabelas
-        db.create_all()
+        logger.info("Criando tabelas...")
+        Base.metadata.create_all(engine)
+        logger.info("Tabelas criadas com sucesso")
         
-        # Verificar se usuário admin já existe
-        admin = User.query.filter_by(email='admin@medflow.com').first()
-        if not admin:
-            # Criar usuário admin
-            admin = User(
-                nome='Administrador',
-                email='admin@medflow.com',
-                tipo='admin',
-                ativo=True
+        # Criar sessão
+        Session = sessionmaker(bind=engine)
+        session = Session()
+        
+        # Verificar se usuário admin existe
+        admin_user = session.query(User).filter_by(email="admin@medflow.com").first()
+        if not admin_user:
+            logger.info("Criando usuário admin...")
+            admin_user = User(
+                nome="Administrador",
+                email="admin@medflow.com",
+                senha_hash=get_password_hash("admin123"),
+                is_admin=True,
+                is_active=True
             )
-            admin.set_password('admin123')
-            db.session.add(admin)
-            db.session.commit()
-            print("Usuário administrador criado com sucesso!")
+            session.add(admin_user)
+            session.commit()
+            logger.info("Usuário admin criado com sucesso")
         else:
-            print("Usuário administrador já existe.")
+            logger.info("Usuário admin já existe")
         
-        # Listar todos os usuários para verificação
-        users = User.query.all()
-        print(f"Total de usuários no banco: {len(users)}")
-        for user in users:
-            print(f"ID: {user.id}, Nome: {user.nome}, Email: {user.email}, Tipo: {user.tipo}, Ativo: {user.ativo}")
+        # Verificar se usuário médico existe
+        medico_user = session.query(User).filter_by(email="medico@medflow.com").first()
+        if not medico_user:
+            logger.info("Criando usuário médico...")
+            medico_user = User(
+                nome="Médico Teste",
+                email="medico@medflow.com",
+                senha_hash=get_password_hash("medico123"),
+                is_admin=False,
+                is_active=True
+            )
+            session.add(medico_user)
+            session.commit()
+            logger.info("Usuário médico criado com sucesso")
+        else:
+            logger.info("Usuário médico já existe")
+        
+        session.close()
+        logger.info("Inicialização do banco de dados concluída com sucesso")
+        
+    except Exception as e:
+        logger.error(f"Erro ao inicializar banco de dados: {str(e)}", exc_info=True)
+        raise
 
 if __name__ == "__main__":
     init_database()
