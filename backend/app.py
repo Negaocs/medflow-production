@@ -18,10 +18,10 @@ logging.basicConfig(
 logger = logging.getLogger("medflow-api")
 
 # Importar modelos e rotas
-from models import get_db, init_database, User
-from routes import auth, medicos, empresas, hospitais, plantoes, procedimentos, contratos
-from routes import tipos_plantao, producao_administrativa, prolabores, descontos_creditos
-from routes import calculos, relatorios, importacao_exportacao
+from src.models import get_db, init_database, User
+from src.routes import auth, medicos, empresas, hospitais, plantoes, procedimentos, contratos
+from src.routes import tipos_plantao, producao_administrativa, prolabores, descontos_creditos
+from src.routes import calculos, relatorios, importacao_exportacao
 
 # Criar aplicação FastAPI
 app = FastAPI(

@@ -1,130 +1,89 @@
-from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required
-from src.models import db
-from src.models.tipo_plantao import TipoPlantao
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from typing import List, Optional
+from pydantic import BaseModel
+from datetime import datetime
 
-tipos_plantao_bp = Blueprint('tipos_plantao', __name__)
+from src.models import get_db, TipoPlantao
+from src.routes.auth import get_current_active_user, User
 
-@tipos_plantao_bp.route('', methods=['GET'])
-@jwt_required()
-def list_tipos_plantao():
-    """Listar todos os tipos_plantao"""
-    try:
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 20, type=int)
-        search = request.args.get('search', '')
-        
-        query = TipoPlantao.query
-        if search:
-            query = query.filter(
-                db.or_(
-                    TipoPlantao.nome.ilike(f'%{search}%'),
-                    TipoPlantao.descricao.ilike(f'%{search}%')
-                )
-            )
-        
-        items = query.paginate(
-            page=page, 
-            per_page=per_page, 
-            error_out=False
-        )
-        
-        return jsonify({
-            'data': [item.to_dict() for item in items.items],
-            'pagination': {
-                'page': items.page,
-                'pages': items.pages,
-                'per_page': items.per_page,
-                'total': items.total,
-                'has_next': items.has_next,
-                'has_prev': items.has_prev
-            }
-        }), 200
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+# Modelos Pydantic
+class TipoPlantaoBase(BaseModel):
+    nome: str
+    descricao: Optional[str] = None
+    is_active: bool = True
 
-@tipos_plantao_bp.route('', methods=['POST'])
-@jwt_required()
-def create_tipos_plantao():
-    """Criar novo tipos_plantao"""
-    try:
-        data = request.get_json()
-        
-        if not data or not data.get('nome'):
-            return jsonify({'error': 'nome' são obrigatórios'}), 400
-        
-        item = TipoPlantao(**data)
-        db.session.add(item)
-        db.session.commit()
-        
-        return jsonify({
-            'message': 'TipoPlantao criado com sucesso',
-            'data': item.to_dict()
-        }), 201
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+class TipoPlantaoCreate(TipoPlantaoBase):
+    pass
 
-@tipos_plantao_bp.route('/<item_id>', methods=['GET'])
-@jwt_required()
-def get_tipos_plantao(item_id):
-    """Obter tipos_plantao por ID"""
-    try:
-        item = TipoPlantao.query.get(item_id)
-        
-        if not item:
-            return jsonify({'error': 'TipoPlantao não encontrado'}), 404
-        
-        return jsonify({'data': item.to_dict()}), 200
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+class TipoPlantaoUpdate(TipoPlantaoBase):
+    pass
 
-@tipos_plantao_bp.route('/<item_id>', methods=['PUT'])
-@jwt_required()
-def update_tipos_plantao(item_id):
-    """Atualizar tipos_plantao"""
-    try:
-        item = TipoPlantao.query.get(item_id)
-        
-        if not item:
-            return jsonify({'error': 'TipoPlantao não encontrado'}), 404
-        
-        data = request.get_json()
-        
-        # Atualizar campos
-        for key, value in data.items():
-            if hasattr(item, key):
-                setattr(item, key, value)
-        
-        db.session.commit()
-        
-        return jsonify({
-            'message': 'TipoPlantao atualizado com sucesso',
-            'data': item.to_dict()
-        }), 200
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+class TipoPlantaoResponse(TipoPlantaoBase):
+    id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    class Config:
+        orm_mode = True
 
-@tipos_plantao_bp.route('/<item_id>', methods=['DELETE'])
-@jwt_required()
-def delete_tipos_plantao(item_id):
-    """Deletar tipos_plantao"""
-    try:
-        item = TipoPlantao.query.get(item_id)
-        
-        if not item:
-            return jsonify({'error': 'TipoPlantao não encontrado'}), 404
-        
-        db.session.delete(item)
-        db.session.commit()
-        
-        return jsonify({'message': 'TipoPlantao deletado com sucesso'}), 200
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+# Criar router
+router = APIRouter()
+
+# Rotas
+@router.post("/", response_model=TipoPlantaoResponse)
+async def create_tipo_plantao(tipo_plantao: TipoPlantaoCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Sem permissão para criar tipos de plantão")
+    
+    db_tipo_plantao = TipoPlantao(
+        nome=tipo_plantao.nome,
+        descricao=tipo_plantao.descricao,
+        is_active=tipo_plantao.is_active
+    )
+    db.add(db_tipo_plantao)
+    db.commit()
+    db.refresh(db_tipo_plantao)
+    return db_tipo_plantao
+
+@router.get("/", response_model=List[TipoPlantaoResponse])
+async def read_tipos_plantao(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    tipos_plantao = db.query(TipoPlantao).offset(skip).limit(limit).all()
+    return tipos_plantao
+
+@router.get("/{tipo_plantao_id}", response_model=TipoPlantaoResponse)
+async def read_tipo_plantao(tipo_plantao_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    db_tipo_plantao = db.query(TipoPlantao).filter(TipoPlantao.id == tipo_plantao_id).first()
+    if db_tipo_plantao is None:
+        raise HTTPException(status_code=404, detail="Tipo de plantão não encontrado")
+    return db_tipo_plantao
+
+@router.put("/{tipo_plantao_id}", response_model=TipoPlantaoResponse)
+async def update_tipo_plantao(tipo_plantao_id: int, tipo_plantao: TipoPlantaoUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Sem permissão para atualizar tipos de plantão")
+    
+    db_tipo_plantao = db.query(TipoPlantao).filter(TipoPlantao.id == tipo_plantao_id).first()
+    if db_tipo_plantao is None:
+        raise HTTPException(status_code=404, detail="Tipo de plantão não encontrado")
+    
+    for key, value in tipo_plantao.dict().items():
+        setattr(db_tipo_plantao, key, value)
+    
+    db.commit()
+    db.refresh(db_tipo_plantao)
+    return db_tipo_plantao
+
+@router.delete("/{tipo_plantao_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_tipo_plantao(tipo_plantao_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Sem permissão para excluir tipos de plantão")
+    
+    db_tipo_plantao = db.query(TipoPlantao).filter(TipoPlantao.id == tipo_plantao_id).first()
+    if db_tipo_plantao is None:
+        raise HTTPException(status_code=404, detail="Tipo de plantão não encontrado")
+    
+    db.delete(db_tipo_plantao)
+    db.commit()
+    return None
+

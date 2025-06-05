@@ -12,6 +12,6 @@ router = APIRouter()
 
 # Rota temporária
 @router.get("/")
-async def read_importacao_exportacao(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    return {"message": "Endpoint de importação e exportação em desenvolvimento"}
+async def read_procedimentos(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    return {"message": "Endpoint de procedimentos em desenvolvimento"}
 

@@ -1,129 +1,120 @@
-from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required
-from src.models import db
-from src.models.plantao import Plantao
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from typing import List, Optional
+from pydantic import BaseModel
+from datetime import datetime
 
-plantoes_bp = Blueprint('plantoes', __name__)
+from src.models import get_db, Plantao, Medico, Hospital, TipoPlantao
+from src.routes.auth import get_current_active_user, User
 
-@plantoes_bp.route('', methods=['GET'])
-@jwt_required()
-def list_plantoes():
-    """Listar todos os plantoes"""
-    try:
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 20, type=int)
-        search = request.args.get('search', '')
-        
-        query = Plantao.query
-        if search:
-            query = query.filter(
-                db.or_(
-                    Plantao.competencia.ilike(f'%{search}%')
-                )
-            )
-        
-        items = query.paginate(
-            page=page, 
-            per_page=per_page, 
-            error_out=False
-        )
-        
-        return jsonify({
-            'data': [item.to_dict() for item in items.items],
-            'pagination': {
-                'page': items.page,
-                'pages': items.pages,
-                'per_page': items.per_page,
-                'total': items.total,
-                'has_next': items.has_next,
-                'has_prev': items.has_prev
-            }
-        }), 200
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+# Modelos Pydantic
+class PlantaoBase(BaseModel):
+    data_inicio: datetime
+    data_fim: datetime
+    valor: float
+    medico_id: int
+    hospital_id: int
+    tipo_plantao_id: int
+    status: str = "agendado"
+    observacoes: Optional[str] = None
 
-@plantoes_bp.route('', methods=['POST'])
-@jwt_required()
-def create_plantoe():
-    """Criar novo plantoe"""
-    try:
-        data = request.get_json()
-        
-        if not data or not data.get('medico_id') or not data.get('hospital_id') or not data.get('tipo_plantao_id') or not data.get('data_inicio') or not data.get('data_fim'):
-            return jsonify({'error': 'medico_id', 'hospital_id', 'tipo_plantao_id', 'data_inicio', 'data_fim' são obrigatórios'}), 400
-        
-        item = Plantao(**data)
-        db.session.add(item)
-        db.session.commit()
-        
-        return jsonify({
-            'message': 'Plantao criado com sucesso',
-            'data': item.to_dict()
-        }), 201
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+class PlantaoCreate(PlantaoBase):
+    pass
 
-@plantoes_bp.route('/<item_id>', methods=['GET'])
-@jwt_required()
-def get_plantoe(item_id):
-    """Obter plantoe por ID"""
-    try:
-        item = Plantao.query.get(item_id)
-        
-        if not item:
-            return jsonify({'error': 'Plantao não encontrado'}), 404
-        
-        return jsonify({'data': item.to_dict()}), 200
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+class PlantaoUpdate(PlantaoBase):
+    pass
 
-@plantoes_bp.route('/<item_id>', methods=['PUT'])
-@jwt_required()
-def update_plantoe(item_id):
-    """Atualizar plantoe"""
-    try:
-        item = Plantao.query.get(item_id)
-        
-        if not item:
-            return jsonify({'error': 'Plantao não encontrado'}), 404
-        
-        data = request.get_json()
-        
-        # Atualizar campos
-        for key, value in data.items():
-            if hasattr(item, key):
-                setattr(item, key, value)
-        
-        db.session.commit()
-        
-        return jsonify({
-            'message': 'Plantao atualizado com sucesso',
-            'data': item.to_dict()
-        }), 200
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+class PlantaoResponse(PlantaoBase):
+    id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    class Config:
+        orm_mode = True
 
-@plantoes_bp.route('/<item_id>', methods=['DELETE'])
-@jwt_required()
-def delete_plantoe(item_id):
-    """Deletar plantoe"""
-    try:
-        item = Plantao.query.get(item_id)
-        
-        if not item:
-            return jsonify({'error': 'Plantao não encontrado'}), 404
-        
-        db.session.delete(item)
-        db.session.commit()
-        
-        return jsonify({'message': 'Plantao deletado com sucesso'}), 200
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+# Criar router
+router = APIRouter()
+
+# Rotas
+@router.post("/", response_model=PlantaoResponse)
+async def create_plantao(plantao: PlantaoCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    # Verificar se o médico existe
+    medico = db.query(Medico).filter(Medico.id == plantao.medico_id).first()
+    if not medico:
+        raise HTTPException(status_code=404, detail="Médico não encontrado")
+    
+    # Verificar se o hospital existe
+    hospital = db.query(Hospital).filter(Hospital.id == plantao.hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital não encontrado")
+    
+    # Verificar se o tipo de plantão existe
+    tipo_plantao = db.query(TipoPlantao).filter(TipoPlantao.id == plantao.tipo_plantao_id).first()
+    if not tipo_plantao:
+        raise HTTPException(status_code=404, detail="Tipo de plantão não encontrado")
+    
+    db_plantao = Plantao(
+        data_inicio=plantao.data_inicio,
+        data_fim=plantao.data_fim,
+        valor=plantao.valor,
+        medico_id=plantao.medico_id,
+        hospital_id=plantao.hospital_id,
+        tipo_plantao_id=plantao.tipo_plantao_id,
+        status=plantao.status,
+        observacoes=plantao.observacoes
+    )
+    db.add(db_plantao)
+    db.commit()
+    db.refresh(db_plantao)
+    return db_plantao
+
+@router.get("/", response_model=List[PlantaoResponse])
+async def read_plantoes(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    plantoes = db.query(Plantao).offset(skip).limit(limit).all()
+    return plantoes
+
+@router.get("/{plantao_id}", response_model=PlantaoResponse)
+async def read_plantao(plantao_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    db_plantao = db.query(Plantao).filter(Plantao.id == plantao_id).first()
+    if db_plantao is None:
+        raise HTTPException(status_code=404, detail="Plantão não encontrado")
+    return db_plantao
+
+@router.put("/{plantao_id}", response_model=PlantaoResponse)
+async def update_plantao(plantao_id: int, plantao: PlantaoUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    db_plantao = db.query(Plantao).filter(Plantao.id == plantao_id).first()
+    if db_plantao is None:
+        raise HTTPException(status_code=404, detail="Plantão não encontrado")
+    
+    # Verificar se o médico existe
+    medico = db.query(Medico).filter(Medico.id == plantao.medico_id).first()
+    if not medico:
+        raise HTTPException(status_code=404, detail="Médico não encontrado")
+    
+    # Verificar se o hospital existe
+    hospital = db.query(Hospital).filter(Hospital.id == plantao.hospital_id).first()
+    if not hospital:
+        raise HTTPException(status_code=404, detail="Hospital não encontrado")
+    
+    # Verificar se o tipo de plantão existe
+    tipo_plantao = db.query(TipoPlantao).filter(TipoPlantao.id == plantao.tipo_plantao_id).first()
+    if not tipo_plantao:
+        raise HTTPException(status_code=404, detail="Tipo de plantão não encontrado")
+    
+    for key, value in plantao.dict().items():
+        setattr(db_plantao, key, value)
+    
+    db.commit()
+    db.refresh(db_plantao)
+    return db_plantao
+
+@router.delete("/{plantao_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_plantao(plantao_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    db_plantao = db.query(Plantao).filter(Plantao.id == plantao_id).first()
+    if db_plantao is None:
+        raise HTTPException(status_code=404, detail="Plantão não encontrado")
+    
+    db.delete(db_plantao)
+    db.commit()
+    return None
+
