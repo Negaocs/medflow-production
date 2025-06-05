@@ -3,7 +3,6 @@ services:
   - type: web
     name: medflow-backend
     env: python
-    region: oregon
     plan: starter
     buildCommand: cd backend && pip install -r requirements.txt
     startCommand: cd backend && gunicorn --bind 0.0.0.0:$PORT app:app
@@ -26,7 +25,6 @@ services:
   - type: web
     name: medflow-frontend
     env: static
-    region: oregon
     plan: starter
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: ./frontend/dist
@@ -42,6 +40,5 @@ databases:
   - name: medflow-db
     databaseName: medflow_production
     user: medflow_user
-    region: oregon
     plan: starter
 
