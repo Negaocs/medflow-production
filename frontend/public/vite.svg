@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="32px" height="32px" viewBox="0 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>MedFlow Logo</title>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="medflow-logo">
+            <circle id="background" fill="#4A90E2" cx="16" cy="16" r="16"></circle>
+            <path d="M8,8 L24,8 C25.1045695,8 26,8.8954305 26,10 L26,22 C26,23.1045695 25.1045695,24 24,24 L8,24 C6.8954305,24 6,23.1045695 6,22 L6,10 C6,8.8954305 6.8954305,8 8,8 Z" id="card" fill="#FFFFFF"></path>
+            <path d="M10,12 L14,12 C14.5522847,12 15,12.4477153 15,13 L15,19 C15,19.5522847 14.5522847,20 14,20 L10,20 C9.44771525,20 9,19.5522847 9,19 L9,13 C9,12.4477153 9.44771525,12 10,12 Z" id="pulse" fill="#FF5252"></path>
+            <rect id="line1" fill="#4A90E2" x="17" y="12" width="6" height="2" rx="1"></rect>
+            <rect id="line2" fill="#4A90E2" x="17" y="15" width="6" height="2" rx="1"></rect>
+            <rect id="line3" fill="#4A90E2" x="17" y="18" width="6" height="2" rx="1"></rect>
+        </g>
+    </g>
+</svg>
+
