@@ -1,46 +1,31 @@
-from app import app, db, User
 import os
 import logging
+from app import app
+from migrations import run_migrations
 
 # Configurar logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("medflow-wsgi")
 
-def init_database():
-    """Inicializar banco de dados e criar usuário admin"""
-    try:
-        with app.app_context():
-            # Criar tabelas
-            db.create_all()
-            
-            # Verificar se usuário admin já existe
-            admin = User.query.filter_by(email='admin@medflow.com').first()
-            if not admin:
-                # Criar usuário admin
-                admin = User(
-                    nome='Administrador',
-                    email='admin@medflow.com',
-                    tipo='admin',
-                    ativo=True
-                )
-                admin.set_password('admin123')
-                db.session.add(admin)
-                db.session.commit()
-                logger.info("Usuário administrador criado com sucesso!")
-            else:
-                logger.info("Usuário administrador já existe.")
-            
-            # Listar todos os usuários para verificação
-            users = User.query.all()
-            logger.info(f"Total de usuários no banco: {len(users)}")
-            for user in users:
-                logger.info(f"ID: {user.id}, Nome: {user.nome}, Email: {user.email}, Tipo: {user.tipo}, Ativo: {user.ativo}")
-    except Exception as e:
-        logger.error(f"Erro ao inicializar banco de dados: {str(e)}")
+# Executar migrações ao iniciar
+try:
+    logger.info("Executando migrações do banco de dados...")
+    run_migrations()
+    logger.info("Migrações concluídas com sucesso")
+except Exception as e:
+    logger.error(f"Erro ao executar migrações: {str(e)}", exc_info=True)
 
-# Inicializar banco de dados
-init_database()
+# Aplicação para o Gunicorn
+application = app
 
 if __name__ == "__main__":
-    app.run()
+    # Para execução direta (não via Gunicorn)
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host="0.0.0.0", port=port)
 
