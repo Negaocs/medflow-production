@@ -1,5 +1,5 @@
 // Simulação de entidades para o frontend
-// Este arquivo simula as entidades do Base44 para permitir o funcionamento do frontend
+// Este arquivo simula as entidades do sistema para permitir o funcionamento do frontend
 
 // Função para gerar um ID único
 const generateId = () => Math.random().toString(36).substring(2, 15);
@@ -24,214 +24,221 @@ const saveData = (key, data) => {
   }
 };
 
-// Classe base para entidades
-class BaseEntity {
-  static async list(orderBy = null, limit = null) {
-    const data = getStoredData(this.storageKey);
-    let result = [...data];
+// Modelo base para todas as entidades
+const createBaseModel = (storageKey, exampleData = []) => {
+  // Inicializar dados de exemplo se não existirem
+  if (typeof window !== 'undefined' && !localStorage.getItem(storageKey)) {
+    saveData(storageKey, exampleData);
+  }
+
+  return {
+    storageKey,
     
-    if (orderBy) {
-      const desc = orderBy.startsWith('-');
-      const field = desc ? orderBy.substring(1) : orderBy;
-      result.sort((a, b) => {
-        if (desc) {
-          return a[field] > b[field] ? -1 : 1;
-        } else {
-          return a[field] > b[field] ? 1 : -1;
+    list: async (orderBy = null, limit = null) => {
+      const data = getStoredData(storageKey);
+      let result = [...data];
+      
+      if (orderBy) {
+        const desc = orderBy.startsWith('-');
+        const field = desc ? orderBy.substring(1) : orderBy;
+        result.sort((a, b) => {
+          if (desc) {
+            return a[field] > b[field] ? -1 : 1;
+          } else {
+            return a[field] > b[field] ? 1 : -1;
+          }
+        });
+      }
+      
+      if (limit && limit > 0) {
+        result = result.slice(0, limit);
+      }
+      
+      return result;
+    },
+    
+    get: async (id) => {
+      const data = getStoredData(storageKey);
+      return data.find(item => item.id === id) || null;
+    },
+    
+    create: async (item) => {
+      const data = getStoredData(storageKey);
+      const newItem = {
+        ...item,
+        id: generateId(),
+        created_date: new Date().toISOString(),
+        updated_date: new Date().toISOString()
+      };
+      data.push(newItem);
+      saveData(storageKey, data);
+      return newItem;
+    },
+    
+    update: async (id, updates) => {
+      const data = getStoredData(storageKey);
+      const index = data.findIndex(item => item.id === id);
+      if (index === -1) {
+        throw new Error(`Item com ID ${id} não encontrado`);
+      }
+      
+      const updatedItem = {
+        ...data[index],
+        ...updates,
+        updated_date: new Date().toISOString()
+      };
+      
+      data[index] = updatedItem;
+      saveData(storageKey, data);
+      return updatedItem;
+    },
+    
+    delete: async (id) => {
+      const data = getStoredData(storageKey);
+      const filteredData = data.filter(item => item.id !== id);
+      saveData(storageKey, filteredData);
+      return { success: true };
+    },
+    
+    filter: async (filters, orderBy = null) => {
+      const data = getStoredData(storageKey);
+      let result = data.filter(item => {
+        for (const [key, value] of Object.entries(filters)) {
+          if (item[key] !== value) {
+            return false;
+          }
         }
+        return true;
       });
-    }
-    
-    if (limit && limit > 0) {
-      result = result.slice(0, limit);
-    }
-    
-    return result;
-  }
-  
-  static async get(id) {
-    const data = getStoredData(this.storageKey);
-    return data.find(item => item.id === id) || null;
-  }
-  
-  static async create(item) {
-    const data = getStoredData(this.storageKey);
-    const newItem = {
-      ...item,
-      id: generateId(),
-      created_date: new Date().toISOString(),
-      updated_date: new Date().toISOString()
-    };
-    data.push(newItem);
-    saveData(this.storageKey, data);
-    return newItem;
-  }
-  
-  static async update(id, updates) {
-    const data = getStoredData(this.storageKey);
-    const index = data.findIndex(item => item.id === id);
-    if (index === -1) {
-      throw new Error(`Item com ID ${id} não encontrado`);
-    }
-    
-    const updatedItem = {
-      ...data[index],
-      ...updates,
-      updated_date: new Date().toISOString()
-    };
-    
-    data[index] = updatedItem;
-    saveData(this.storageKey, data);
-    return updatedItem;
-  }
-  
-  static async delete(id) {
-    const data = getStoredData(this.storageKey);
-    const filteredData = data.filter(item => item.id !== id);
-    saveData(this.storageKey, filteredData);
-    return { success: true };
-  }
-  
-  static async filter(filters) {
-    const data = getStoredData(this.storageKey);
-    return data.filter(item => {
-      for (const [key, value] of Object.entries(filters)) {
-        if (item[key] !== value) {
-          return false;
-        }
+      
+      if (orderBy) {
+        const desc = orderBy.startsWith('-');
+        const field = desc ? orderBy.substring(1) : orderBy;
+        result.sort((a, b) => {
+          if (desc) {
+            return a[field] > b[field] ? -1 : 1;
+          } else {
+            return a[field] > b[field] ? 1 : -1;
+          }
+        });
       }
-      return true;
-    });
-  }
-}
-
-// Definição das entidades
-export class User extends BaseEntity {
-  static storageKey = 'medflow_users';
-}
-
-export class Medico extends BaseEntity {
-  static storageKey = 'medflow_medicos';
-}
-
-export class Empresa extends BaseEntity {
-  static storageKey = 'medflow_empresas';
-}
-
-export class Hospital extends BaseEntity {
-  static storageKey = 'medflow_hospitais';
-}
-
-export class TipoPlantao extends BaseEntity {
-  static storageKey = 'medflow_tipos_plantao';
-}
-
-export class Plantao extends BaseEntity {
-  static storageKey = 'medflow_plantoes';
-}
-
-export class ProcedimentoParticular extends BaseEntity {
-  static storageKey = 'medflow_procedimentos';
-}
-
-export class ProducaoAdministrativa extends BaseEntity {
-  static storageKey = 'medflow_producao_administrativa';
-}
-
-export class ProLabore extends BaseEntity {
-  static storageKey = 'medflow_prolabores';
-}
-
-export class DescontoCredito extends BaseEntity {
-  static storageKey = 'medflow_descontos_creditos';
-}
-
-export class MedicoEmpresa extends BaseEntity {
-  static storageKey = 'medflow_medico_empresa';
-}
-
-export class Contrato extends BaseEntity {
-  static storageKey = 'medflow_contratos';
-}
-
-export class ContratoTipoPlantao extends BaseEntity {
-  static storageKey = 'medflow_contrato_tipo_plantao';
-}
-
-export class UsuarioSistema extends BaseEntity {
-  static storageKey = 'medflow_usuarios_sistema';
-}
-
-export class GrupoAcesso extends BaseEntity {
-  static storageKey = 'medflow_grupos_acesso';
-}
-
-export class UsuarioGrupo extends BaseEntity {
-  static storageKey = 'medflow_usuario_grupo';
-}
-
-export class TabelaINSS extends BaseEntity {
-  static storageKey = 'medflow_tabela_inss';
-}
-
-export class TabelaIRRF extends BaseEntity {
-  static storageKey = 'medflow_tabela_irrf';
-}
-
-export class ParametrosFiscaisEmpresa extends BaseEntity {
-  static storageKey = 'medflow_parametros_fiscais_empresa';
-}
-
-export class VinculoFiscalMedico extends BaseEntity {
-  static storageKey = 'medflow_vinculo_fiscal_medico';
-}
-
-export class ResultadoCalculoProducao extends BaseEntity {
-  static storageKey = 'medflow_resultado_calculo_producao';
-}
-
-export class ItemCalculadoProducao extends BaseEntity {
-  static storageKey = 'medflow_item_calculado_producao';
-}
-
-export class ResultadoCalculoProLabore extends BaseEntity {
-  static storageKey = 'medflow_resultado_calculo_prolabore';
-}
-
-export class ItemCalculadoProLabore extends BaseEntity {
-  static storageKey = 'medflow_item_calculado_prolabore';
-}
-
-// Inicializar dados de exemplo se não existirem
-const initializeExampleData = () => {
-  // Usuários do sistema
-  if (!localStorage.getItem(UsuarioSistema.storageKey)) {
-    const usuarios = [
-      {
-        id: 'admin-user-id',
-        nome_completo: 'Administrador',
-        email: 'admin@medflow.com',
-        senha: 'admin123', // Em produção, isso seria um hash
-        perfil: 'administrador',
-        ativo: true,
-        created_date: new Date().toISOString(),
-        updated_date: new Date().toISOString()
-      },
-      {
-        id: 'medico-user-id',
-        nome_completo: 'Médico Teste',
-        email: 'medico@medflow.com',
-        senha: 'medico123', // Em produção, isso seria um hash
-        perfil: 'medico',
-        ativo: true,
-        created_date: new Date().toISOString(),
-        updated_date: new Date().toISOString()
-      }
-    ];
-    saveData(UsuarioSistema.storageKey, usuarios);
-  }
+      
+      return result;
+    }
+  };
 };
 
-// Inicializar dados de exemplo
-initializeExampleData();
+// Modelo Medico
+export const Medico = createBaseModel('medflow_medicos', [
+  {
+    id: 'med-1',
+    nome: 'Dr. João Silva',
+    crm: '12345',
+    estado_crm: 'SP',
+    email: 'joao.silva@medflow.com',
+    telefone: '(11) 98765-4321',
+    especialidade: 'Clínica Geral',
+    ativo: true,
+    created_date: new Date().toISOString(),
+    updated_date: new Date().toISOString()
+  },
+  {
+    id: 'med-2',
+    nome: 'Dra. Maria Santos',
+    crm: '54321',
+    estado_crm: 'RJ',
+    email: 'maria.santos@medflow.com',
+    telefone: '(21) 98765-4321',
+    especialidade: 'Cardiologia',
+    ativo: true,
+    created_date: new Date().toISOString(),
+    updated_date: new Date().toISOString()
+  }
+]);
+
+// Modelo Empresa
+export const Empresa = createBaseModel('medflow_empresas', [
+  {
+    id: 'emp-1',
+    nome: 'Hospital São Lucas',
+    cnpj: '12.345.678/0001-90',
+    email: 'contato@saolucas.com',
+    telefone: '(11) 3333-4444',
+    endereco: 'Av. Paulista, 1000',
+    cidade: 'São Paulo',
+    estado: 'SP',
+    ativo: true,
+    created_date: new Date().toISOString(),
+    updated_date: new Date().toISOString()
+  },
+  {
+    id: 'emp-2',
+    nome: 'Clínica Saúde Total',
+    cnpj: '98.765.432/0001-10',
+    email: 'contato@saudetotal.com',
+    telefone: '(11) 2222-3333',
+    endereco: 'Rua Augusta, 500',
+    cidade: 'São Paulo',
+    estado: 'SP',
+    ativo: true,
+    created_date: new Date().toISOString(),
+    updated_date: new Date().toISOString()
+  }
+]);
+
+// Modelo MedicoEmpresa (vínculo entre médicos e empresas)
+export const MedicoEmpresa = createBaseModel('medflow_medicos_empresas', [
+  {
+    id: 'vinc-1',
+    medico_id: 'med-1',
+    empresa_id: 'emp-1',
+    data_inicio: '2023-01-01',
+    data_fim: null,
+    ativo: true,
+    created_date: new Date().toISOString(),
+    updated_date: new Date().toISOString()
+  },
+  {
+    id: 'vinc-2',
+    medico_id: 'med-2',
+    empresa_id: 'emp-1',
+    data_inicio: '2023-02-15',
+    data_fim: null,
+    ativo: true,
+    created_date: new Date().toISOString(),
+    updated_date: new Date().toISOString()
+  }
+]);
+
+// Modelo UsuarioSistema
+export const UsuarioSistema = createBaseModel('medflow_usuarios', [
+  {
+    id: 'user-1',
+    nome_completo: 'Administrador',
+    email: 'admin@medflow.com',
+    senha_hash: 'YWRtaW4xMjNzYWx0X21lZGZsb3dfMjAyNA==', // admin123
+    perfil: 'administrador',
+    ativo: true,
+    created_date: new Date().toISOString(),
+    updated_date: new Date().toISOString()
+  },
+  {
+    id: 'user-2',
+    nome_completo: 'João Silva',
+    email: 'joao.silva@medflow.com',
+    senha_hash: 'am9hbzEyM3NhbHRfbWVkZmxvd18yMDI0', // joao123
+    perfil: 'medico',
+    ativo: true,
+    created_date: new Date().toISOString(),
+    updated_date: new Date().toISOString()
+  }
+]);
+
+// Exportar todas as entidades
+export default {
+  Medico,
+  Empresa,
+  MedicoEmpresa,
+  UsuarioSistema
+};
 
