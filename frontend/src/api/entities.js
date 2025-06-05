@@ -186,6 +186,106 @@ export const Empresa = createBaseModel('medflow_empresas', [
   }
 ]);
 
+// Modelo Hospital
+export const Hospital = createBaseModel('medflow_hospitais', [
+  {
+    id: 'hosp-1',
+    nome: 'Hospital São Lucas',
+    cnpj: '12.345.678/0001-90',
+    email: 'contato@saolucas.com',
+    telefone: '(11) 3333-4444',
+    endereco: 'Av. Paulista, 1000',
+    cidade: 'São Paulo',
+    estado: 'SP',
+    ativo: true,
+    created_date: new Date().toISOString(),
+    updated_date: new Date().toISOString()
+  },
+  {
+    id: 'hosp-2',
+    nome: 'Hospital Santa Casa',
+    cnpj: '98.765.432/0001-10',
+    email: 'contato@santacasa.com',
+    telefone: '(11) 2222-3333',
+    endereco: 'Rua Augusta, 500',
+    cidade: 'São Paulo',
+    estado: 'SP',
+    ativo: true,
+    created_date: new Date().toISOString(),
+    updated_date: new Date().toISOString()
+  }
+]);
+
+// Modelo Contrato
+export const Contrato = createBaseModel('medflow_contratos', [
+  {
+    id: 'cont-1',
+    empresa_id: 'emp-1',
+    hospital_id: 'hosp-1',
+    numero_contrato: 'CT-2023-001',
+    data_inicio: '2023-01-01',
+    data_fim: '2023-12-31',
+    ativo: true,
+    created_date: new Date().toISOString(),
+    updated_date: new Date().toISOString()
+  },
+  {
+    id: 'cont-2',
+    empresa_id: 'emp-2',
+    hospital_id: 'hosp-2',
+    numero_contrato: 'CT-2023-002',
+    data_inicio: '2023-02-01',
+    data_fim: '2023-12-31',
+    ativo: true,
+    created_date: new Date().toISOString(),
+    updated_date: new Date().toISOString()
+  }
+]);
+
+// Modelo TipoPlantao
+export const TipoPlantao = createBaseModel('medflow_tipos_plantao', [
+  {
+    id: 'tp-1',
+    nome: 'Plantão Diurno',
+    carga_horaria: 12,
+    descricao: 'Plantão de 12 horas durante o dia',
+    ativo: true,
+    created_date: new Date().toISOString(),
+    updated_date: new Date().toISOString()
+  },
+  {
+    id: 'tp-2',
+    nome: 'Plantão Noturno',
+    carga_horaria: 12,
+    descricao: 'Plantão de 12 horas durante a noite',
+    ativo: true,
+    created_date: new Date().toISOString(),
+    updated_date: new Date().toISOString()
+  }
+]);
+
+// Modelo ContratoTipoPlantao
+export const ContratoTipoPlantao = createBaseModel('medflow_contratos_tipos_plantao', [
+  {
+    id: 'ctp-1',
+    contrato_id: 'cont-1',
+    tipo_plantao_id: 'tp-1',
+    valor: 1200.00,
+    ativo: true,
+    created_date: new Date().toISOString(),
+    updated_date: new Date().toISOString()
+  },
+  {
+    id: 'ctp-2',
+    contrato_id: 'cont-1',
+    tipo_plantao_id: 'tp-2',
+    valor: 1500.00,
+    ativo: true,
+    created_date: new Date().toISOString(),
+    updated_date: new Date().toISOString()
+  }
+]);
+
 // Modelo MedicoEmpresa (vínculo entre médicos e empresas)
 export const MedicoEmpresa = createBaseModel('medflow_medicos_empresas', [
   {
@@ -238,7 +338,10 @@ export const UsuarioSistema = createBaseModel('medflow_usuarios', [
 export default {
   Medico,
   Empresa,
+  Hospital,
+  Contrato,
+  TipoPlantao,
+  ContratoTipoPlantao,
   MedicoEmpresa,
   UsuarioSistema
 };
-
