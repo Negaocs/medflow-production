@@ -1,7 +1,7 @@
 import os
 import sys
 from datetime import datetime, timedelta
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, make_response
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, jwt_required, create_access_token, get_jwt_identity
@@ -44,10 +44,21 @@ db = SQLAlchemy(app)
 jwt = JWTManager(app)
 
 # Configurar CORS para produção
-cors_origins = os.environ.get('CORS_ORIGINS', '*').split(',')
-CORS(app, origins=cors_origins, supports_credentials=True, 
+CORS(app, 
+     origins=['https://medflow-frontend-i059.onrender.com', 'http://localhost:3000'],
+     supports_credentials=True,
      allow_headers=['Content-Type', 'Authorization'],
-     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
+     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+     expose_headers=['Content-Type', 'Authorization'])
+
+# Adicionar headers CORS em todas as respostas
+@app.after_request
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = 'https://medflow-frontend-i059.onrender.com'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    response.headers['Access-Control-Allow-Credentials'] = 'true'
+    return response
 
 # Modelos do banco de dados
 class User(db.Model):
