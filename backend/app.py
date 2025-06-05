@@ -129,12 +129,35 @@ class Interesse(db.Model):
         }
 
 # Rotas da API
-@app.route('/api/health', methods=['GET'])
+@app.route('/')
+def index():
+    return jsonify({
+        'message': 'MedFlow API',
+        'version': '1.0.0',
+        'status': 'online'
+    })
+
+@app.route('/api')
+def api_index():
+    return jsonify({
+        'message': 'MedFlow API',
+        'version': '1.0.0',
+        'status': 'online'
+    })
+
+@app.route('/api/health')
 def health_check():
+    try:
+        # Verificar conexão com o banco
+        db_status = "connected" if db.engine.connect() else "disconnected"
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+    
     return jsonify({
         'status': 'healthy',
         'timestamp': datetime.utcnow().isoformat(),
-        'version': '1.0.0'
+        'version': '1.0.0',
+        'database': db_status
     })
 
 @app.route('/api/auth/login', methods=['POST', 'OPTIONS'])
@@ -303,37 +326,53 @@ def criar_medico():
         return jsonify({'error': 'Erro interno do servidor'}), 500
 
 # Servir arquivos estáticos do frontend (se necessário)
-@app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve_frontend(path):
     if path != "" and os.path.exists(os.path.join('static', path)):
         return send_from_directory('static', path)
     else:
-        return send_from_directory('static', 'index.html')
+        return jsonify({
+            'message': 'MedFlow API',
+            'version': '1.0.0',
+            'status': 'online',
+            'path': path
+        })
 
 def create_admin_user():
     """Criar usuário administrador padrão"""
-    admin = User.query.filter_by(email='admin@medflow.com').first()
-    if not admin:
-        admin = User(
-            nome='Administrador',
-            email='admin@medflow.com',
-            tipo='admin'
-        )
-        admin.set_password('admin123')
-        db.session.add(admin)
-        db.session.commit()
-        app.logger.info('Usuário administrador criado')
+    try:
+        admin = User.query.filter_by(email='admin@medflow.com').first()
+        if not admin:
+            admin = User(
+                nome='Administrador',
+                email='admin@medflow.com',
+                tipo='admin',
+                ativo=True
+            )
+            admin.set_password('admin123')
+            db.session.add(admin)
+            db.session.commit()
+            app.logger.info('Usuário administrador criado')
+        else:
+            app.logger.info('Usuário administrador já existe')
+    except Exception as e:
+        app.logger.error(f'Erro ao criar usuário administrador: {str(e)}')
 
 def init_database():
     """Inicializar banco de dados"""
-    with app.app_context():
-        db.create_all()
-        create_admin_user()
-        app.logger.info('Banco de dados inicializado')
+    try:
+        with app.app_context():
+            db.create_all()
+            create_admin_user()
+            app.logger.info('Banco de dados inicializado')
+    except Exception as e:
+        app.logger.error(f'Erro ao inicializar banco de dados: {str(e)}')
+
+# Inicializar banco de dados ao iniciar o aplicativo
+with app.app_context():
+    init_database()
 
 if __name__ == '__main__':
-    init_database()
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
 
