@@ -39,7 +39,19 @@ function App() {
     setLoading(true)
     setError('')
     try {
-      const response = await axios.post('/auth/login', { email, password })
+      console.log('Tentando login com:', { email, password })
+      console.log('URL da API:', API_BASE_URL)
+      
+      const response = await axios.post('/auth/login', { email, password }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        withCredentials: false
+      })
+      
+      console.log('Resposta do login:', response.data)
+      
       if (response.data.success) {
         localStorage.setItem('access_token', response.data.access_token)
         localStorage.setItem('user_data', JSON.stringify(response.data.user))
@@ -48,7 +60,8 @@ function App() {
         setSuccess('Login realizado com sucesso!')
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Erro ao fazer login')
+      console.error('Erro no login:', err)
+      setError(err.response?.data?.error || 'Erro ao fazer login. Verifique suas credenciais.')
     } finally {
       setLoading(false)
     }

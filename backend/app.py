@@ -137,34 +137,53 @@ def health_check():
         'version': '1.0.0'
     })
 
-@app.route('/api/auth/login', methods=['POST'])
+@app.route('/api/auth/login', methods=['POST', 'OPTIONS'])
 def login():
+    # Tratar requisições OPTIONS (preflight)
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add('Access-Control-Allow-Origin', 'https://medflow-frontend-i059.onrender.com')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        return response
+        
     try:
         data = request.get_json()
+        app.logger.info(f"Tentativa de login recebida: {data}")
+        
         email = data.get('email')
         password = data.get('password')
         
         if not email or not password:
+            app.logger.warning("Email ou senha não fornecidos")
             return jsonify({'error': 'Email e senha são obrigatórios'}), 400
         
         user = User.query.filter_by(email=email).first()
+        app.logger.info(f"Usuário encontrado: {user}")
         
         if user and user.check_password(password) and user.ativo:
             access_token = create_access_token(identity=user.id)
             app.logger.info(f'Login realizado com sucesso para usuário: {email}')
-            return jsonify({
+            
+            response = jsonify({
                 'success': True,
                 'message': 'Login realizado com sucesso',
                 'access_token': access_token,
                 'user': user.to_dict()
             })
+            
+            # Adicionar headers CORS específicos
+            response.headers.add('Access-Control-Allow-Origin', 'https://medflow-frontend-i059.onrender.com')
+            response.headers.add('Access-Control-Allow-Credentials', 'true')
+            return response
         else:
             app.logger.warning(f'Tentativa de login falhada para usuário: {email}')
             return jsonify({'error': 'Credenciais inválidas'}), 401
             
     except Exception as e:
         app.logger.error(f'Erro no login: {str(e)}')
-        return jsonify({'error': 'Erro interno do servidor'}), 500
+        return jsonify({'error': f'Erro interno do servidor: {str(e)}'}), 500
 
 @app.route('/api/auth/register', methods=['POST'])
 def register():
