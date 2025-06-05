@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
 
+// Importando o sistema completo do Base44
+import Pages from './pages';
+
 // Componente de Login
 function Login() {
   const [email, setEmail] = useState('');
@@ -47,7 +50,7 @@ function Login() {
   };
 
   if (isLoggedIn) {
-    return <Navigate to="/dashboard" />;
+    return <Navigate to="/Dashboard" />;
   }
 
   return (
@@ -55,7 +58,7 @@ function Login() {
       <div className="max-w-md w-full bg-white rounded-lg shadow-xl overflow-hidden">
         <div className="px-6 py-8">
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-extrabold text-gray-900">MedFlow</h2>
+            <h2 className="text-3xl font-extrabold text-gray-900">Hospitalia</h2>
             <p className="mt-2 text-sm text-gray-600">
               Sistema de Gestão de Produção Médica
             </p>
@@ -114,74 +117,11 @@ function Login() {
               </button>
             </div>
           </form>
-          
-          <div className="mt-6">
-            <div className="text-center text-sm">
-              <p className="text-gray-500">
-                Credenciais de demonstração:
-              </p>
-              <p className="text-gray-500">
-                Email: admin@medflow.com
-              </p>
-              <p className="text-gray-500">
-                Senha: admin123
-              </p>
-            </div>
-          </div>
         </div>
         <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 text-center">
           <p className="text-xs text-gray-600">
-            &copy; 2025 MedFlow. Todos os direitos reservados.
+            &copy; 2025 Hospitalia. Todos os direitos reservados.
           </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Componente Dashboard (placeholder)
-function Dashboard() {
-  const [user, setUser] = useState(null);
-  
-  useEffect(() => {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      setUser(JSON.parse(userStr));
-    }
-  }, []);
-  
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.location.href = '/';
-  };
-  
-  if (!user) {
-    return <Navigate to="/" />;
-  }
-  
-  return (
-    <div className="min-h-screen bg-gray-100">
-      <nav className="bg-blue-800 text-white p-4">
-        <div className="container mx-auto flex justify-between items-center">
-          <h1 className="text-xl font-bold">MedFlow</h1>
-          <div className="flex items-center space-x-4">
-            <span>Olá, {user.name}</span>
-            <button 
-              onClick={handleLogout}
-              className="bg-blue-700 hover:bg-blue-600 px-3 py-1 rounded text-sm"
-            >
-              Sair
-            </button>
-          </div>
-        </div>
-      </nav>
-      
-      <div className="container mx-auto p-6">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-2xl font-bold mb-4">Dashboard</h2>
-          <p className="mb-4">Bem-vindo ao sistema MedFlow!</p>
-          <p>Esta é uma versão de demonstração. O sistema completo está em desenvolvimento.</p>
         </div>
       </div>
     </div>
@@ -194,8 +134,7 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Login />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="*" element={<Navigate to="/" />} />
+        <Route path="/*" element={<Pages />} />
       </Routes>
     </Router>
   );

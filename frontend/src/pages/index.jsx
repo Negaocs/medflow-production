@@ -50,7 +50,7 @@ import DocumentacaoTecnica from "./DocumentacaoTecnica";
 
 import ParametrosPDF from "./ParametrosPDF";
 
-import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
+import { Route, Routes, useLocation } from 'react-router-dom';
 
 const PAGES = {
     
@@ -119,8 +119,8 @@ function _getCurrentPage(url) {
     return pageName || Object.keys(PAGES)[0];
 }
 
-// Create a wrapper component that uses useLocation inside the Router context
-function PagesContent() {
+// Componente principal que não usa Router (já está no App.jsx)
+export default function Pages() {
     const location = useLocation();
     const currentPage = _getCurrentPage(location.pathname);
     
@@ -186,10 +186,3 @@ function PagesContent() {
     );
 }
 
-export default function Pages() {
-    return (
-        <Router>
-            <PagesContent />
-        </Router>
-    );
-}
