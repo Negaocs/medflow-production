@@ -1,4 +1,3 @@
-import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { 
   Users, 
@@ -20,7 +19,7 @@ import {
   ArrowDown,
   Minus
 } from "lucide-react";
-import { Medico, Empresa, Hospital as HospitalEntity, Plantao, ProcedimentoParticular, ProducaoAdministrativa } from "@/api/entities";
+import { Medico, Empresa } from "@/api/entities";
 import { format, parseISO, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -33,427 +32,278 @@ const formatCurrency = (value) => {
   })}`;
 };
 
-const calculatePercentageChange = (current, previous) => {
-  if (previous === 0) {
-    return current > 0 ? { value: "+100%", icon: ArrowUp, color: "text-green-600" } : { value: "0%", icon: Minus, color: "text-slate-500" };
-  }
-  if (current === previous) return { value: "0%", icon: Minus, color: "text-slate-500" };
-  const change = ((current - previous) / previous) * 100;
-  const icon = change > 0 ? ArrowUp : ArrowDown;
-  const color = change > 0 ? "text-green-600" : "text-red-600";
-  return { value: `${change > 0 ? '+' : ''}${change.toFixed(0)}%`, icon, color };
+// Dados simulados para o dashboard
+const simulateData = () => {
+  // Dados de hospitais simulados
+  const hospitais = [
+    { id: 'hosp-1', nome: 'Hospital São Lucas', cidade: 'São Paulo', estado: 'SP' },
+    { id: 'hosp-2', nome: 'Hospital Santa Casa', cidade: 'Rio de Janeiro', estado: 'RJ' }
+  ];
+  
+  // Dados de plantões simulados
+  const plantoes = [
+    { id: 'plant-1', medico_id: 'med-1', hospital_id: 'hosp-1', data_inicio: '2023-05-01T08:00:00', data_fim: '2023-05-01T20:00:00', valor: 1200.00 },
+    { id: 'plant-2', medico_id: 'med-2', hospital_id: 'hosp-1', data_inicio: '2023-05-02T20:00:00', data_fim: '2023-05-03T08:00:00', valor: 1500.00 }
+  ];
+  
+  // Dados de procedimentos particulares simulados
+  const procedimentosParticulares = [
+    { id: 'proc-1', medico_id: 'med-1', paciente: 'Carlos Oliveira', data: '2023-05-10', procedimento: 'Consulta', valor: 300.00 },
+    { id: 'proc-2', medico_id: 'med-2', paciente: 'Ana Silva', data: '2023-05-12', procedimento: 'Exame', valor: 500.00 }
+  ];
+  
+  // Dados de produção administrativa simulados
+  const producaoAdministrativa = [
+    { id: 'prod-1', medico_id: 'med-1', empresa_id: 'emp-1', data: '2023-05-15', descricao: 'Reunião administrativa', valor: 200.00 },
+    { id: 'prod-2', medico_id: 'med-2', empresa_id: 'emp-1', data: '2023-05-20', descricao: 'Treinamento de equipe', valor: 350.00 }
+  ];
+  
+  return { hospitais, plantoes, procedimentosParticulares, producaoAdministrativa };
 };
 
 export default function Dashboard() {
-  const [stats, setStats] = useState({
-    novosMedicosMes: 0,
-    novosMedicosMesComparison: { value: "0%", icon: Minus, color: "text-slate-500" },
-    novasEmpresasMes: 0,
-    novasEmpresasMesComparison: { value: "0%", icon: Minus, color: "text-slate-500" },
-    novosHospitaisMes: 0,
-    novosHospitaisMesComparison: { value: "0%", icon: Minus, color: "text-slate-500" },
-    totalPlantoesMes: 0,
-    totalPlantoesMesComparison: { value: "0%", icon: Minus, color: "text-slate-500" },
-    producaoFinanceiraMes: 0,
-    producaoFinanceiraMesComparison: { value: "0%", icon: Minus, color: "text-slate-500" },
-    plantoesConfirmadosMes: 0,
-    plantoesPendentesMes: 0,
-    totalProcedimentosMes: 0,
-    totalProcedimentosMesComparison: { value: "0%", icon: Minus, color: "text-slate-500" },
-    valorProcedimentosMes: 0,
-    totalProducaoAdmMes: 0,
-    totalProducaoAdmMesComparison: { value: "0%", icon: Minus, color: "text-slate-500" },
-    valorProducaoAdmMes: 0,
-  });
-  const [atividadesRecentes, setAtividadesRecentes] = useState([]);
-  const [producaoFinanceiraHistorico, setProducaoFinanceiraHistorico] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [currentMonthDisplay, setCurrentMonthDisplay] = useState("");
-
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  const getProducaoFinanceiraMensal = (plantoes, procedimentos, producaoAdm, mesISO) => {
-    const plantoesDoMes = plantoes.filter(p => p.competencia === mesISO);
-    const procedimentosDoMes = procedimentos.filter(p => p.competencia === mesISO);
-    const producaoAdmDoMes = producaoAdm.filter(p => p.competencia === mesISO);
-    
-    const valorPlantoes = plantoesDoMes.reduce((sum, p) => sum + (p.valor_total || 0), 0);
-    const valorProcedimentos = procedimentosDoMes.reduce((sum, p) => sum + (p.valor_liquido_repasse || 0), 0);
-    const valorProducaoAdm = producaoAdmDoMes.reduce((sum, p) => sum + (p.valor_total || 0), 0);
-    
-    return valorPlantoes + valorProcedimentos + valorProducaoAdm;
-  };
-
-  const countNewRecordsInMonth = (records, monthISO) => {
-    const monthStartDate = startOfMonth(parseISO(`${monthISO}-01`));
-    const monthEndDate = endOfMonth(parseISO(`${monthISO}-01`));
-    return records.filter(r => {
-      const createdDate = parseISO(r.created_date);
-      return createdDate >= monthStartDate && createdDate <= monthEndDate;
-    }).length;
-  };
-
-  const loadDashboardData = async () => {
-    setIsLoading(true);
-    try {
-      const today = new Date();
-      const currentMonthISO = format(today, "yyyy-MM");
-      const previousMonthISO = format(subMonths(today, 1), "yyyy-MM");
-      setCurrentMonthDisplay(format(parseISO(`${currentMonthISO}-01`), "MMMM/yyyy", { locale: ptBR }));
-
-      const [
-        medicosData, 
-        empresasData, 
-        hospitaisData, 
-        allPlantoes,
-        allProcedimentos,
-        allProducaoAdm
-      ] = await Promise.all([
-        Medico.list(null, 10000),
-        Empresa.list(null, 10000),
-        HospitalEntity.list(null, 10000),
-        Plantao.list(null, 10000),
-        ProcedimentoParticular.list(null, 10000),
-        ProducaoAdministrativa.list(null, 10000)
-      ]);
-
-      // Dados do Mês Atual
-      const plantoesMesAtual = allPlantoes.filter(p => p.competencia === currentMonthISO);
-      const procedimentosMesAtual = allProcedimentos.filter(p => p.competencia === currentMonthISO);
-      const producaoAdmMesAtual = allProducaoAdm.filter(p => p.competencia === currentMonthISO);
-
-      const producaoFinanceiraMesAtual = getProducaoFinanceiraMensal(allPlantoes, allProcedimentos, allProducaoAdm, currentMonthISO);
-      const novosMedicosMesAtual = countNewRecordsInMonth(medicosData, currentMonthISO);
-      const novasEmpresasMesAtual = countNewRecordsInMonth(empresasData, currentMonthISO);
-      const novosHospitaisMesAtual = countNewRecordsInMonth(hospitaisData, currentMonthISO);
-      
-      // Dados do Mês Anterior para Comparação
-      const plantoesMesAnterior = allPlantoes.filter(p => p.competencia === previousMonthISO);
-      const procedimentosMesAnterior = allProcedimentos.filter(p => p.competencia === previousMonthISO);
-      const producaoAdmMesAnterior = allProducaoAdm.filter(p => p.competencia === previousMonthISO);
-      
-      const producaoFinanceiraMesAnterior = getProducaoFinanceiraMensal(allPlantoes, allProcedimentos, allProducaoAdm, previousMonthISO);
-      const novosMedicosMesAnterior = countNewRecordsInMonth(medicosData, previousMonthISO);
-      const novasEmpresasMesAnterior = countNewRecordsInMonth(empresasData, previousMonthISO);
-      const novosHospitaisMesAnterior = countNewRecordsInMonth(hospitaisData, previousMonthISO);
-
-      setStats({
-        novosMedicosMes: novosMedicosMesAtual,
-        novosMedicosMesComparison: calculatePercentageChange(novosMedicosMesAtual, novosMedicosMesAnterior),
-        novasEmpresasMes: novasEmpresasMesAtual,
-        novasEmpresasMesComparison: calculatePercentageChange(novasEmpresasMesAtual, novasEmpresasMesAnterior),
-        novosHospitaisMes: novosHospitaisMesAtual,
-        novosHospitaisMesComparison: calculatePercentageChange(novosHospitaisMesAtual, novosHospitaisMesAnterior),
-        
-        totalPlantoesMes: plantoesMesAtual.length,
-        totalPlantoesMesComparison: calculatePercentageChange(plantoesMesAtual.length, plantoesMesAnterior.length),
-        producaoFinanceiraMes: producaoFinanceiraMesAtual,
-        producaoFinanceiraMesComparison: calculatePercentageChange(producaoFinanceiraMesAtual, producaoFinanceiraMesAnterior),
-        
-        plantoesConfirmadosMes: plantoesMesAtual.filter(p => p.confirmado).length,
-        plantoesPendentesMes: plantoesMesAtual.filter(p => !p.confirmado).length,
-        
-        totalProcedimentosMes: procedimentosMesAtual.length,
-        totalProcedimentosMesComparison: calculatePercentageChange(procedimentosMesAtual.length, procedimentosMesAnterior.length),
-        valorProcedimentosMes: procedimentosMesAtual.reduce((total, p) => total + (p.valor_liquido_repasse || 0), 0),
-        
-        totalProducaoAdmMes: producaoAdmMesAtual.length,
-        totalProducaoAdmMesComparison: calculatePercentageChange(producaoAdmMesAtual.length, producaoAdmMesAnterior.length),
-        valorProducaoAdmMes: producaoAdmMesAtual.reduce((total, p) => total + (p.valor_total || 0), 0),
-      });
-
-      // Histórico de Produção Financeira (Últimos 6 meses)
-      const historico = [];
-      for (let i = 5; i >= 0; i--) {
-        const mesParaHistoricoDate = subMonths(today, i);
-        const mesParaHistoricoISO = format(mesParaHistoricoDate, "yyyy-MM");
-        const valorMes = getProducaoFinanceiraMensal(allPlantoes, allProcedimentos, allProducaoAdm, mesParaHistoricoISO);
-        historico.push({
-          name: format(mesParaHistoricoDate, "MMM/yy", { locale: ptBR }),
-          "Produção Financeira": valorMes,
-        });
-      }
-      setProducaoFinanceiraHistorico(historico);
-
-      // Atividades Recentes
-      const recentes = [];
-      const ultimosPlantoes = await Plantao.list("-created_date", 2);
-      ultimosPlantoes.forEach(p => {
-        const medico = medicosData.find(m => m.id === p.medico_id);
-        recentes.push({
-          tipo: "Plantão",
-          descricao: `Novo plantão para ${medico?.nome || 'Médico N/A'}`,
-          data: p.created_date,
-          icon: Calendar,
-          color: "bg-blue-500"
-        });
-      });
-
-      const ultimosMedicos = await Medico.list("-created_date", 2);
-      ultimosMedicos.forEach(m => {
-        recentes.push({
-          tipo: "Médico",
-          descricao: `Médico ${m.nome} cadastrado`,
-          data: m.created_date,
-          icon: Stethoscope,
-          color: "bg-green-500"
-        });
-      });
-      
-      const ultimoProcedimento = await ProcedimentoParticular.list("-created_date", 1);
-      if (ultimoProcedimento.length > 0) {
-        const proc = ultimoProcedimento[0];
-        const medico = medicosData.find(m => m.id === proc.medico_id);
-        recentes.push({
-          tipo: "Procedimento",
-          descricao: `Proced. ${proc.nome_paciente} por ${medico?.nome || 'Médico N/A'}`,
-          data: proc.created_date,
-          icon: Paperclip,
-          color: "bg-purple-500"
-        });
-      }
-      setAtividadesRecentes(recentes.sort((a, b) => new Date(b.data) - new Date(a.data)).slice(0, 5));
-
-    } catch (error) {
-      console.error('Erro ao carregar dados do dashboard:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const StatCard = ({ title, value, icon: Icon, color, description, comparison, isLoading }) => (
-    <Card className="bg-white shadow-lg border-0 hover:shadow-xl transition-all duration-300">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-slate-600">{title}</CardTitle>
-        {Icon && (
-          <div className={`p-2 rounded-lg ${color || 'bg-slate-500'}`}>
-            <Icon className="h-5 w-5 text-white" />
-          </div>
-        )}
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold text-slate-800">
-          {isLoading ? (
-            <div className="animate-pulse bg-slate-200 h-8 w-16 rounded"></div>
-          ) : (
-            value
-          )}
-        </div>
-        {description && (
-          <p className="text-xs text-slate-500 mt-1">{description}</p>
-        )}
-        {!isLoading && comparison && (
-          <div className={`text-xs flex items-center mt-1 ${comparison.color}`}>
-            <comparison.icon className="w-3 h-3 mr-1" />
-            {comparison.value} vs mês anterior
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-
-  const ActivityItem = ({ icon: Icon, color, title, timeAgo }) => (
-    <div className="flex items-start gap-3">
-      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${color}`}>
-        <Icon className="w-5 h-5 text-white" />
-      </div>
-      <div className="flex-1">
-        <p className="text-sm font-medium text-slate-800">{title}</p>
-        <p className="text-xs text-slate-500">{timeAgo}</p>
-      </div>
-    </div>
-  );
+  // Obter dados simulados
+  const { hospitais, plantoes, procedimentosParticulares, producaoAdministrativa } = simulateData();
   
-  const timeSince = (dateString) => {
-    if (!dateString) return "";
-    const date = parseISO(dateString);
-    const seconds = Math.floor((new Date() - date) / 1000);
-    let interval = seconds / 31536000;
-    if (interval > 1) return Math.floor(interval) + " anos atrás";
-    interval = seconds / 2592000;
-    if (interval > 1) return Math.floor(interval) + " meses atrás";
-    interval = seconds / 86400;
-    if (interval > 1) return Math.floor(interval) + " dias atrás";
-    interval = seconds / 3600;
-    if (interval > 1) return Math.floor(interval) + " horas atrás";
-    interval = seconds / 60;
-    if (interval > 1) return Math.floor(interval) + " minutos atrás";
-    return Math.floor(seconds) + " segundos atrás";
-  };
-
+  // Calcular estatísticas
+  const totalMedicos = 15; // Simulado
+  const totalEmpresas = 5; // Simulado
+  const totalHospitais = hospitais.length;
+  const totalPlantoes = plantoes.length;
+  const totalProcedimentos = procedimentosParticulares.length;
+  const totalProducao = producaoAdministrativa.length;
+  
+  // Calcular valores financeiros
+  const valorTotalPlantoes = plantoes.reduce((total, plantao) => total + plantao.valor, 0);
+  const valorTotalProcedimentos = procedimentosParticulares.reduce((total, proc) => total + proc.valor, 0);
+  const valorTotalProducao = producaoAdministrativa.reduce((total, prod) => total + prod.valor, 0);
+  const valorTotalGeral = valorTotalPlantoes + valorTotalProcedimentos + valorTotalProducao;
+  
+  // Dados para o gráfico
+  const chartData = [
+    { name: 'Jan', plantoes: 12000, procedimentos: 5000, producao: 3000 },
+    { name: 'Fev', plantoes: 15000, procedimentos: 6000, producao: 2500 },
+    { name: 'Mar', plantoes: 18000, procedimentos: 7500, producao: 4000 },
+    { name: 'Abr', plantoes: 16000, procedimentos: 8000, producao: 3500 },
+    { name: 'Mai', plantoes: 20000, procedimentos: 9000, producao: 5000 },
+    { name: 'Jun', plantoes: 22000, procedimentos: 8500, producao: 4500 },
+  ];
 
   return (
-    <div className="p-6 space-y-8 bg-slate-50 min-h-screen">
-      <div className="space-y-1">
-        <h1 className="text-3xl font-bold text-slate-800">Dashboard</h1>
-        <p className="text-slate-600">Visão geral da produção médica e indicadores para {currentMonthDisplay || "o mês atual"}</p>
+    <div className="p-6 space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <p className="text-muted-foreground">
+          Visão geral da produção médica e financeira
+        </p>
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          title="Novos Médicos (Mês)"
-          value={stats.novosMedicosMes}
-          icon={Users}
-          color="bg-gradient-to-r from-blue-500 to-blue-600"
-          comparison={stats.novosMedicosMesComparison}
-          isLoading={isLoading}
-        />
-        <StatCard
-          title="Novas Empresas (Mês)"
-          value={stats.novasEmpresasMes}
-          icon={Building2}
-          color="bg-gradient-to-r from-teal-500 to-teal-600"
-          comparison={stats.novasEmpresasMesComparison}
-          isLoading={isLoading}
-        />
-        <StatCard
-          title="Novos Hospitais (Mês)"
-          value={stats.novosHospitaisMes}
-          icon={HospitalIcon}
-          color="bg-gradient-to-r from-sky-500 to-sky-600"
-          comparison={stats.novosHospitaisMesComparison}
-          isLoading={isLoading}
-        />
-        <StatCard
-          title="Total Plantões (Mês)"
-          value={stats.totalPlantoesMes}
-          icon={Calendar}
-          color="bg-gradient-to-r from-amber-500 to-amber-600"
-          comparison={stats.totalPlantoesMesComparison}
-          isLoading={isLoading}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2 bg-white shadow-lg border-0">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-slate-800">
-              <DollarSign className="h-5 w-5 text-green-600" />
-              Produção Financeira ({currentMonthDisplay})
-            </CardTitle>
-            <CardDescription className="flex items-center">
-              Soma de Plantões, Procedimentos (líquido) e Produção Administrativa.
-              {!isLoading && stats.producaoFinanceiraMesComparison && (
-                <span className={`ml-2 text-xs flex items-center ${stats.producaoFinanceiraMesComparison.color}`}>
-                  <stats.producaoFinanceiraMesComparison.icon className="w-3 h-3 mr-1" />
-                  {stats.producaoFinanceiraMesComparison.value} vs mês anterior
-                </span>
-              )}
-            </CardDescription>
+      
+      {/* Cards de estatísticas */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Médicos</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="text-center">
-              <span className="text-4xl font-bold text-green-600">
-                {isLoading ? (
-                  <div className="animate-pulse bg-slate-200 h-10 w-48 mx-auto rounded"></div>
-                ) : (
-                  formatCurrency(stats.producaoFinanceiraMes)
-                )}
-              </span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t">
-              <div className="text-center p-3 bg-green-50 rounded-lg">
-                <p className="text-xs text-green-700 font-medium">PLANTÕES CONFIRMADOS</p>
-                <p className="text-xl font-semibold text-green-800">{isLoading ? '-' : stats.plantoesConfirmadosMes}</p>
-              </div>
-              <div className="text-center p-3 bg-yellow-50 rounded-lg">
-                <p className="text-xs text-yellow-700 font-medium">PLANTÕES PENDENTES</p>
-                <p className="text-xl font-semibold text-yellow-800">{isLoading ? '-' : stats.plantoesPendentesMes}</p>
-              </div>
-               <div className="text-center p-3 bg-sky-50 rounded-lg">
-                <p className="text-xs text-sky-700 font-medium">PROCEDIMENTOS (MÊS)</p>
-                <p className="text-xl font-semibold text-sky-800">{isLoading ? '-' : stats.totalProcedimentosMes}</p>
-                <p className="text-sm text-sky-600">
-                    {isLoading ? '-' : formatCurrency(stats.valorProcedimentosMes)}
-                    {!isLoading && stats.totalProcedimentosMesComparison && (
-                        <span className={`ml-1 text-xs flex items-center justify-center ${stats.totalProcedimentosMesComparison.color}`}>
-                            <stats.totalProcedimentosMesComparison.icon className="w-2.5 h-2.5 mr-0.5" />
-                            {stats.totalProcedimentosMesComparison.value}
-                        </span>
-                    )}
-                </p>
-              </div>
-            </div>
-             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-              <div className="text-center p-3 bg-indigo-50 rounded-lg sm:col-start-2">
-                <p className="text-xs text-indigo-700 font-medium">PROD. ADMIN. (MÊS)</p>
-                <p className="text-xl font-semibold text-indigo-800">{isLoading ? '-' : stats.totalProducaoAdmMes}</p>
-                <p className="text-sm text-indigo-600">
-                    {isLoading ? '-' : formatCurrency(stats.valorProducaoAdmMes)}
-                     {!isLoading && stats.totalProducaoAdmMesComparison && (
-                        <span className={`ml-1 text-xs flex items-center justify-center ${stats.totalProducaoAdmMesComparison.color}`}>
-                            <stats.totalProducaoAdmMesComparison.icon className="w-2.5 h-2.5 mr-0.5" />
-                            {stats.totalProducaoAdmMesComparison.value}
-                        </span>
-                    )}
-                </p>
-              </div>
-            </div>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalMedicos}</div>
+            <p className="text-xs text-muted-foreground">
+              Médicos cadastrados no sistema
+            </p>
           </CardContent>
         </Card>
-
-        <Card className="bg-white shadow-lg border-0">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-slate-800">
-              <Clock className="h-5 w-5 text-blue-600" />
-              Atividades Recentes
-            </CardTitle>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Empresas</CardTitle>
+            <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="space-y-4 max-h-96 overflow-y-auto">
-            {isLoading && Array(5).fill(0).map((_, i) => (
-              <div key={i} className="flex items-start gap-3 animate-pulse">
-                <div className="w-10 h-10 rounded-lg bg-slate-200"></div>
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-slate-200 rounded w-3/4"></div>
-                  <div className="h-3 bg-slate-200 rounded w-1/2"></div>
-                </div>
-              </div>
-            ))}
-            {!isLoading && atividadesRecentes.length === 0 && (
-              <p className="text-sm text-slate-500 text-center py-4">Nenhuma atividade recente para mostrar.</p>
-            )}
-            {!isLoading && atividadesRecentes.map((activity, index) => (
-              <ActivityItem
-                key={index}
-                icon={activity.icon}
-                color={activity.color}
-                title={activity.descricao}
-                timeAgo={timeSince(activity.data)}
-              />
-            ))}
+          <CardContent>
+            <div className="text-2xl font-bold">{totalEmpresas}</div>
+            <p className="text-xs text-muted-foreground">
+              Empresas parceiras
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Hospitais</CardTitle>
+            <HospitalIcon className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalHospitais}</div>
+            <p className="text-xs text-muted-foreground">
+              Hospitais conveniados
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(valorTotalGeral)}</div>
+            <p className="text-xs text-muted-foreground">
+              Produção total no período
+            </p>
           </CardContent>
         </Card>
       </div>
       
-      <Card className="bg-white shadow-lg border-0">
+      {/* Gráfico de produção */}
+      <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-slate-800">
-            <TrendingUp className="h-5 w-5 text-purple-600" />
-            Histórico de Produção Financeira (Últimos 6 Meses)
-          </CardTitle>
+          <CardTitle>Produção Financeira</CardTitle>
+          <CardDescription>
+            Evolução da produção financeira nos últimos 6 meses
+          </CardDescription>
         </CardHeader>
-        <CardContent className="h-80"> {/* Definir uma altura para o container do gráfico */}
-          {isLoading ? (
-            <div className="animate-pulse bg-slate-200 h-full w-full rounded-lg"></div>
-          ) : producaoFinanceiraHistorico.length > 0 ? (
+        <CardContent className="pt-2">
+          <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={producaoFinanceiraHistorico} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke="#64748b" />
-                <YAxis tickFormatter={(value) => `R$${(value/1000).toFixed(0)}k`} tick={{ fontSize: 12 }} stroke="#64748b" />
-                <Tooltip formatter={(value) => [formatCurrency(value), "Produção"]} labelStyle={{color: '#334155'}} itemStyle={{color: '#8b5cf6'}}/>
-                <Legend wrapperStyle={{fontSize: "14px"}}/>
-                <Line type="monotone" dataKey="Produção Financeira" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 4, fill: '#8b5cf6' }} activeDot={{ r: 6 }} />
+              <LineChart
+                data={chartData}
+                margin={{
+                  top: 5,
+                  right: 10,
+                  left: 10,
+                  bottom: 0,
+                }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip formatter={(value) => formatCurrency(value)} />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey="plantoes"
+                  stroke="#2563eb"
+                  strokeWidth={2}
+                  name="Plantões"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="procedimentos"
+                  stroke="#10b981"
+                  strokeWidth={2}
+                  name="Procedimentos"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="producao"
+                  stroke="#f59e0b"
+                  strokeWidth={2}
+                  name="Produção Adm."
+                />
               </LineChart>
             </ResponsiveContainer>
-          ) : (
-            <p className="text-sm text-slate-500 text-center py-10">Dados insuficientes para exibir o histórico.</p>
-          )}
+          </div>
         </CardContent>
       </Card>
-
+      
+      {/* Cards de produção detalhada */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Plantões</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(valorTotalPlantoes)}</div>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-muted-foreground">{totalPlantoes} plantões realizados</span>
+              <span className="flex items-center text-sm text-green-500">
+                <ArrowUp className="h-4 w-4 mr-1" />
+                12%
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Procedimentos</CardTitle>
+            <Stethoscope className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(valorTotalProcedimentos)}</div>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-muted-foreground">{totalProcedimentos} procedimentos realizados</span>
+              <span className="flex items-center text-sm text-green-500">
+                <ArrowUp className="h-4 w-4 mr-1" />
+                8%
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Produção Administrativa</CardTitle>
+            <Briefcase className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(valorTotalProducao)}</div>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-muted-foreground">{totalProducao} atividades registradas</span>
+              <span className="flex items-center text-sm text-red-500">
+                <ArrowDown className="h-4 w-4 mr-1" />
+                3%
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* Status de tarefas */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Status de Tarefas</CardTitle>
+          <CardDescription>
+            Visão geral das tarefas pendentes e concluídas
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="h-5 w-5 text-amber-500" />
+                <span>Plantões pendentes de aprovação</span>
+              </div>
+              <span className="font-medium">5</span>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <CheckCircle2 className="h-5 w-5 text-green-500" />
+                <span>Plantões aprovados este mês</span>
+              </div>
+              <span className="font-medium">28</span>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Clock className="h-5 w-5 text-blue-500" />
+                <span>Cálculos pendentes</span>
+              </div>
+              <span className="font-medium">3</span>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <FileText className="h-5 w-5 text-purple-500" />
+                <span>Relatórios gerados este mês</span>
+              </div>
+              <span className="font-medium">12</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
+
