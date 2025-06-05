@@ -3,7 +3,6 @@ services:
   - type: web
     name: medflow-backend
     env: python
-    plan: starter
     buildCommand: cd backend && pip install -r requirements.txt
     startCommand: cd backend && gunicorn --bind 0.0.0.0:$PORT app:app
     healthCheckPath: /api/health
@@ -25,7 +24,6 @@ services:
   - type: web
     name: medflow-frontend
     env: static
-    plan: starter
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: ./frontend/dist
     routes:
@@ -40,5 +38,4 @@ databases:
   - name: medflow-db
     databaseName: medflow_production
     user: medflow_user
-    plan: starter
 
