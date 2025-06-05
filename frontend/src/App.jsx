@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 
 // Configuração da API baseada no ambiente
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+const API_BASE_URL = 'https://medflow-backend.onrender.com/api'
 
 // Configurar axios
 axios.defaults.baseURL = API_BASE_URL
@@ -218,14 +218,6 @@ function App() {
               {loading ? <span className="loading"></span> : 'Entrar'}
             </button>
           </form>
-
-          <div className="text-center mt-4">
-            <p style={{ color: '#666', fontSize: '14px', marginBottom: '10px' }}>Credenciais de demonstração:</p>
-            <p style={{ color: '#667eea', fontSize: '14px' }}>
-              <strong>Email:</strong> admin@medflow.com<br />
-              <strong>Senha:</strong> admin123
-            </p>
-          </div>
 
           <div className="text-center mt-4">
             <button className="btn btn-secondary" onClick={() => setCurrentView('home')}>
